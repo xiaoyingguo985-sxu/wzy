@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>珠穆朗玛峰 3D 地形模型</title>
+<style>
+  :root{--ink:#183247;--glass:rgba(255,255,255,.82);--line:rgba(24,50,71,.16)}
+  *{box-sizing:border-box} html,body{height:100%;margin:0;overflow:hidden}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;background:linear-gradient(#dcecf4 0%,#f6fbfd 58%,#e8eef1 100%);color:var(--ink)}
+  canvas{position:fixed;inset:0;width:100%;height:100%;touch-action:none;cursor:grab} canvas:active{cursor:grabbing}
+  .title{position:fixed;left:24px;top:20px;z-index:2;background:var(--glass);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.72);border-radius:18px;padding:16px 18px;box-shadow:0 10px 35px rgba(35,61,78,.12);max-width:min(470px,calc(100vw - 48px))}
+  h1{font-size:clamp(22px,4.6vw,36px);margin:0 0 5px;font-weight:800;letter-spacing:.02em} .sub{font-size:13px;opacity:.76;line-height:1.45}
+  .badge{display:inline-block;margin-top:9px;padding:5px 9px;border-radius:999px;background:#eef5f7;border:1px solid var(--line);font-size:12px;font-weight:650}
+  .info{position:fixed;right:22px;top:22px;z-index:2;width:min(260px,calc(100vw - 44px));background:var(--glass);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.72);border-radius:16px;padding:14px 15px;box-shadow:0 10px 35px rgba(35,61,78,.12);line-height:1.5;font-size:13px}
+  .info b{font-size:15px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#50798f;margin-right:7px}
+  .controls{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:3;display:flex;gap:8px;background:rgba(255,255,255,.88);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.8);border-radius:16px;padding:8px;box-shadow:0 9px 30px rgba(35,61,78,.14)}
+  button{border:0;border-radius:11px;padding:10px 13px;background:#eef4f6;color:var(--ink);font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}button:hover{background:#e3edf1}.primary{background:#244e63;color:white}.primary:hover{background:#1d4255}
+  .hint{position:fixed;left:22px;bottom:25px;z-index:2;font-size:12px;opacity:.65;background:rgba(255,255,255,.68);padding:8px 10px;border-radius:10px}
+  .label{position:fixed;z-index:2;pointer-events:none;display:none;transform:translate(-50%,-100%);background:rgba(26,47,60,.88);color:white;border-radius:9px;padding:6px 9px;font-size:12px;box-shadow:0 5px 16px rgba(0,0,0,.18)}.label:after{content:"";position:absolute;left:50%;bottom:-7px;border:7px solid transparent;border-top-color:rgba(26,47,60,.88);border-bottom:0;transform:translateX(-50%)}
+  .credit{position:fixed;right:16px;bottom:8px;font-size:10px;opacity:.45;z-index:2}
+  @media(max-width:700px){.title{left:12px;top:12px;padding:12px 14px}.info{right:12px;top:auto;bottom:82px;width:210px;padding:10px 12px}.hint{display:none}.controls{bottom:12px}.controls button{padding:9px 10px;font-size:12px}.credit{display:none}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="title"><h1>珠穆朗玛峰 3D 地形模型</h1><div class="sub">喜马拉雅山脉 · 雪山 · 陡峭山峰 · 冰川与山体沟壑</div><span class="badge">地理教学示意模型</span></div>
+<div class="info"><b><span class="dot"></span>珠穆朗玛峰</b><br>海拔约 8848.86 m<br>位于喜马拉雅山脉中段<br><span style="opacity:.65">模型垂直比例经过适度夸张，便于观察地形。</span></div>
+<div class="controls"><button id="spin" class="primary">暂停旋转</button><button id="reset">重置视角</button><button id="labels">隐藏标注</button></div>
+<div class="hint">拖动旋转 · 滚轮/双指缩放 · 可自由观察山体</div>
+<div class="label" id="peakLabel">珠穆朗玛峰 · 8848.86 m</div>
+<div class="credit">AI 生成 · 3D 地形教学网页</div>
+<script>
+(()=>{
+'use strict';
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d',{alpha:true});
+const peakLabel=document.getElementById('peakLabel');
+let W=innerWidth,H=innerHeight,DPR=Math.min(devicePixelRatio||1,1.55);
+function resize(){W=innerWidth;H=innerHeight;canvas.width=W*DPR;canvas.height=H*DPR;canvas.style.width=W+'px';canvas.style.height=H+'px';ctx.setTransform(DPR,0,0,DPR,0,0)}
+addEventListener('resize',resize);resize();
+
+// Deterministic pseudo-noise: layered ridges, no external libraries.
+function hash(x,z){let n=Math.sin(x*127.1+z*311.7)*43758.5453123;return n-Math.floor(n)}
+function smooth(t){return t*t*(3-2*t)}
+function noise(x,z){let x0=Math.floor(x),z0=Math.floor(z),xf=x-x0,zf=z-z0;let a=hash(x0,z0),b=hash(x0+1,z0),c=hash(x0,z0+1),d=hash(x0+1,z0+1),u=smooth(xf),v=smooth(zf);return (a+(b-a)*u)+((c+(d-c)*u)-(a+(b-a)*u))*v}
+function fbm(x,z){let s=0,a=.55,f=.8;for(let i=0;i<5;i++){s+=(noise(x*f,z*f)-.5)*a;f*=2.03;a*=.52}return s}
+function gauss(x,z,cx,cz,sx,sz,h){let dx=(x-cx)/sx,dz=(z-cz)/sz;return h*Math.exp(-(dx*dx+dz*dz)*1.65)}
+function height(x,z){
+  let h=0;
+  // Everest + surrounding Himalayan ridgeline.
+  h+=gauss(x,z,0.8,-0.4,2.45,2.05,5.8);
+  h+=gauss(x,z,-3.0,-1.2,2.2,1.75,3.8);
+  h+=gauss(x,z,3.6,1.0,2.0,1.7,3.4);
+  h+=gauss(x,z,-1.2,3.2,1.8,2.0,2.6);
+  h+=gauss(x,z,4.0,-3.0,1.7,1.8,2.45);
+  h+=gauss(x,z,-4.4,3.0,1.9,2.3,2.25);
+  // Himalayan ridge structure and gullies.
+  const ridge=Math.abs(fbm(x*.72,z*.58));
+  h+=ridge*1.7 + fbm(x*1.35,z*1.35)*.65;
+  h+=.32*Math.sin((x+z)*1.25)+.18*Math.sin((x-z)*2.2);
+  // carve two glacial valleys
+  h-=1.2*Math.exp(-Math.pow(z-(x*.24+3.6),2)/.75)*Math.exp(-Math.pow(x+1.1,2)/23);
+  h-=0.75*Math.exp(-Math.pow(z-(-x*.19+4.9),2)/.9)*Math.exp(-Math.pow(x-1.0,2)/29);
+  return Math.max(-.45,h);
+}
+
+const N=44,S=11.2,verts=[],tris=[];let maxY=-99,peakIndex=0;
+for(let iz=0;iz<N;iz++)for(let ix=0;ix<N;ix++){
+  let x=(ix/(N-1)-.5)*S*2,z=(iz/(N-1)-.5)*S*2,y=height(x,z);
+  if(y>maxY){maxY=y;peakIndex=verts.length}
+  verts.push({x,y,z});
+}
+for(let z=0;z<N-1;z++)for(let x=0;x<N-1;x++){
+  let i=z*N+x,a=i,b=i+1,c=i+N,d=i+N+1;
+  // checker split avoids uniform diagonal patterns
+  if((x+z)%2){tris.push([a,b,c],[b,d,c])}else{tris.push([a,b,d],[a,d,c])}
+}
+
+// Camera / interaction state.
+let yaw=-.55,pitch=.54,zoom=1,auto=true,showLabels=true,drag=false,lastX=0,lastY=0,lastT=performance.now();
+function reset(){yaw=-.55;pitch=.54;zoom=1;auto=true;document.getElementById('spin').textContent='暂停旋转';document.getElementById('spin').classList.add('primary')}
+document.getElementById('reset').onclick=reset;
+document.getElementById('spin').onclick=e=>{auto=!auto;e.currentTarget.textContent=auto?'暂停旋转':'继续旋转';e.currentTarget.classList.toggle('primary',auto)};
+document.getElementById('labels').onclick=e=>{showLabels=!showLabels;e.currentTarget.textContent=showLabels?'隐藏标注':'显示标注';peakLabel.style.display=showLabels?'block':'none'};
+canvas.addEventListener('pointerdown',e=>{drag=true;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener('pointermove',e=>{if(!drag)return;yaw+=(e.clientX-lastX)*.009;pitch+=(e.clientY-lastY)*.007;pitch=Math.max(.12,Math.min(1.14,pitch));lastX=e.clientX;lastY=e.clientY});
+canvas.addEventListener('pointerup',()=>drag=false);canvas.addEventListener('pointercancel',()=>drag=false);
+canvas.addEventListener('wheel',e=>{e.preventDefault();zoom*=Math.exp(-e.deltaY*.001);zoom=Math.max(.62,Math.min(2.1,zoom))},{passive:false});
+let pinch=0;
+canvas.addEventListener('touchmove',e=>{if(e.touches.length===2){e.preventDefault();let a=e.touches[0],b=e.touches[1],d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);if(pinch)zoom=Math.max(.62,Math.min(2.1,zoom*d/pinch));pinch=d}},{passive:false});
+canvas.addEventListener('touchend',()=>pinch=0);
+
+function rotate(v){
+  // center terrain slightly lower in view
+  let x=v.x,z=v.z,y=v.y-1.65;
+  let cy=Math.cos(yaw),sy=Math.sin(yaw),x1=x*cy-z*sy,z1=x*sy+z*cy;
+  let cp=Math.cos(pitch),sp=Math.sin(pitch),y2=y*cp-z1*sp,z2=y*sp+z1*cp;
+  return{x:x1,y:y2,z:z2};
+}
+function project(v){let d=26/zoom,den=d+v.z+8,scale=Math.min(W,H)*.78;return{x:W/2+v.x*scale/den,y:H*.61-v.y*scale/den,z:v.z,s:scale/den}}
+function shade(y,light,ice){
+  let r,g,b;
+  if(ice){r=204;g=229;b=237}
+  else if(y>4.25){r=240;g=244;b=244}
+  else if(y>3.25){let t=(y-3.25);r=176+60*t;g=187+52*t;b=190+50*t}
+  else if(y>1.2){let t=(y-1.2)/2.05;r=105+64*t;g=104+68*t;b=99+76*t}
+  else {let t=Math.max(0,(y+.4)/1.6);r=78+42*t;g=81+38*t;b=78+33*t}
+  let k=.58+.55*Math.max(0,light);r=Math.min(255,r*k);g=Math.min(255,g*k);b=Math.min(255,b*k);
+  return `rgb(${r|0},${g|0},${b|0})`;
+}
+function render(t){
+  let dt=Math.min(.04,(t-lastT)/1000);lastT=t;if(auto&&!drag)yaw+=dt*.095;
+  ctx.clearRect(0,0,W,H);
+  // horizon haze / ground shadow
+  let grad=ctx.createRadialGradient(W/2,H*.73,10,W/2,H*.73,Math.min(W,H)*.55);grad.addColorStop(0,'rgba(68,84,92,.22)');grad.addColorStop(1,'rgba(68,84,92,0)');ctx.fillStyle=grad;ctx.beginPath();ctx.ellipse(W/2,H*.75,Math.min(W,H)*.5,Math.min(W,H)*.12,0,0,Math.PI*2);ctx.fill();
+  const rv=verts.map(rotate),pv=rv.map(project),draw=[];
+  const lx=.42,ly=.83,lz=-.36;
+  for(let ti=0;ti<tris.length;ti++){
+    let [ia,ib,ic]=tris[ti],A=rv[ia],B=rv[ib],C=rv[ic],pa=pv[ia],pb=pv[ib],pc=pv[ic];
+    let ux=B.x-A.x,uy=B.y-A.y,uz=B.z-A.z,vx=C.x-A.x,vy=C.y-A.y,vz=C.z-A.z;
+    let nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx,nl=Math.hypot(nx,ny,nz)||1;nx/=nl;ny/=nl;nz/=nl;
+    let light=nx*lx+ny*ly+nz*lz,avgY=(verts[ia].y+verts[ib].y+verts[ic].y)/3;
+    // glacial tint in valleys: pale blue-white winding through low channels
+    let avgX=(verts[ia].x+verts[ib].x+verts[ic].x)/3,avgZ=(verts[ia].z+verts[ib].z+verts[ic].z)/3;
+    let glacier=(avgY<1.25 && Math.abs(avgZ-(avgX*.24+3.6))<.42 && avgX>-6.5 && avgX<6.2) || (avgY<1.1 && Math.abs(avgZ-(-avgX*.19+4.9))<.36);
+    draw.push({pa,pb,pc,z:(A.z+B.z+C.z)/3,col:shade(avgY,light,glacier)});
+  }
+  draw.sort((a,b)=>b.z-a.z);
+  ctx.lineJoin='round';
+  for(const q of draw){ctx.beginPath();ctx.moveTo(q.pa.x,q.pa.y);ctx.lineTo(q.pb.x,q.pb.y);ctx.lineTo(q.pc.x,q.pc.y);ctx.closePath();ctx.fillStyle=q.col;ctx.fill();ctx.strokeStyle='rgba(35,45,48,.055)';ctx.lineWidth=.35;ctx.stroke()}
+  if(showLabels){let p=pv[peakIndex];peakLabel.style.display='block';peakLabel.style.left=p.x+'px';peakLabel.style.top=(p.y-6)+'px'}else peakLabel.style.display='none';
+  requestAnimationFrame(render)
+}
+requestAnimationFrame(render);
+})();
+</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>
