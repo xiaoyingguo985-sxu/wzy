@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>孟德尔遗传虚拟实验室｜豌豆颜色演示版</title>
+<style>
+:root{
+  --green:#2f7d4e; --light:#eef7f1; --line:#9db7a8;
+  --yellow:#f1c93b; --pea-green:#56a764; --ink:#173b2b;
+}
+*{box-sizing:border-box}
+body{
+  font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif;
+  background:linear-gradient(180deg,#eef7f1,#f8fcf9);
+  margin:0;color:var(--ink)
+}
+main{max-width:900px;margin:auto;padding:20px}
+.c{
+  background:white;border-radius:16px;padding:18px;margin:12px 0;
+  box-shadow:0 6px 20px #0001;border:1px solid #dcebe1
+}
+h1{font-size:28px;margin:4px 0}
+h2{font-size:19px;margin-top:0}
+select,button{
+  font-size:16px;padding:9px 12px;margin:5px;
+  border:1px solid #7aa78c;border-radius:10px;background:white
+}
+button{background:#256c45;color:white;cursor:pointer;border:none}
+button:hover{filter:brightness(1.07)}
+table{border-collapse:collapse;margin:10px auto}
+td,th{border:1px solid var(--line);padding:10px;text-align:center}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bar{height:16px;background:#dfece4;border-radius:9px;overflow:hidden}
+.bar i{display:block;height:100%;transition:width .5s}
+.bar.yellow i{background:var(--yellow)}
+.bar.green i{background:var(--pea-green)}
+small{color:#537565}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:14px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:14px;height:14px;border-radius:50%;display:inline-block;box-shadow:inset 0 0 0 1px #0002}
+.pea{
+  width:38px;height:38px;border-radius:50%;display:inline-flex;
+  align-items:center;justify-content:center;margin:4px;
+  border:2px solid #ffffffaa;box-shadow:inset -6px -8px 10px #0002,0 2px 6px #0002;
+  font-weight:700;color:#173b2b
+}
+.pea.yellow{background:radial-gradient(circle at 32% 28%,#fff5a6,#f1c93b 55%,#caa51e)}
+.pea.green{background:radial-gradient(circle at 32% 28%,#bfe8a8,#56a764 55%,#367f46);color:white}
+.parent-wrap{display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap}
+.parent-card{
+  min-width:170px;text-align:center;background:#f8fbf8;border:1px solid #dfece4;
+  border-radius:14px;padding:12px
+}
+.cross{font-size:30px;font-weight:700;color:#5a7f68}
+.parent-genotype{font-size:20px;font-weight:800}
+.parent-phenotype{font-size:14px;color:#537565}
+.offspring-grid{
+  display:grid;grid-template-columns:repeat(10,1fr);gap:6px;
+  max-width:620px;margin:14px auto 4px
+}
+.mini-pea{
+  aspect-ratio:1/1;border-radius:50%;
+  box-shadow:inset -3px -4px 5px #0002,0 1px 2px #0002;
+  transform:scale(.15);opacity:0;
+  animation:pop .32s ease forwards
+}
+.mini-pea.yellow{background:radial-gradient(circle at 30% 25%,#fff5a6,#f1c93b 58%,#caa51e)}
+.mini-pea.green{background:radial-gradient(circle at 30% 25%,#bfe8a8,#56a764 58%,#367f46)}
+@keyframes pop{to{transform:scale(1);opacity:1}}
+.punnett-pea{width:18px;height:18px;border-radius:50%;display:inline-block;vertical-align:middle;margin-left:5px}
+.notice{background:#f6fbf7;border-left:4px solid var(--green);padding:10px 12px;border-radius:8px}
+@media(max-width:650px){
+  .g{grid-template-columns:1fr}
+  .offspring-grid{gap:4px}
+  .pea{width:34px;height:34px}
+}
+</style>
+</head>
+<body>
+<main>
+  <h1>🌱 孟德尔遗传虚拟实验室</h1>
+  <p>研究豌豆种子颜色的单性状遗传：<b>A</b> 为显性黄色，<b>a</b> 为隐性绿色。</p>
+
+  <div class="c">
+    <h2>1. 设置亲本</h2>
+    亲本1
+    <select id="p1" onchange="run()">
+      <option>AA</option><option selected>Aa</option><option>aa</option>
+    </select>
+    × 亲本2
+    <select id="p2" onchange="run()">
+      <option>AA</option><option selected>Aa</option><option>aa</option>
+    </select>
+    <button onclick="run()">模拟100个后代</button>
+
+    <div class="parent-wrap" style="margin-top:12px">
+      <div class="parent-card">
+        <b>亲本1</b><br>
+        <span id="parentPea1" class="pea yellow">Aa</span>
+        <div id="parentText1" class="parent-phenotype">黄色豌豆</div>
+      </div>
+      <div class="cross">×</div>
+      <div class="parent-card">
+        <b>亲本2</b><br>
+        <span id="parentPea2" class="pea yellow">Aa</span>
+        <div id="parentText2" class="parent-phenotype">黄色豌豆</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="c g">
+    <section>
+      <h2>2. 棋盘格预测</h2>
+      <table id="t"></table>
+      <div class="legend">
+        <span><i class="dot" style="background:#f1c93b"></i>黄色（AA / Aa）</span>
+        <span><i class="dot" style="background:#56a764"></i>绿色（aa）</span>
+      </div>
+    </section>
+    <section>
+      <h2>3. 模拟结果</h2>
+      <div id="r">点击“模拟100个后代”开始实验。</div>
+    </section>
+  </div>
+
+  <div class="c">
+    <h2>4. 豌豆颜色变化演示</h2>
+    <p class="notice">
+      改变亲本基因型后，亲本颜色、棋盘格中的后代颜色，以及下方100粒后代豌豆都会同步重新模拟。
+    </p>
+    <div id="offspringGrid" class="offspring-grid" aria-label="100个后代豌豆颜色演示"></div>
+    <p id="summary" style="text-align:center;font-weight:700"></p>
+  </div>
+
+  <div class="c">
+    <h2>思考题</h2>
+    <p>当 Aa × Aa 时，理论上基因型 AA:Aa:aa≈1:2:1；表现型黄色:绿色≈3:1。多次模拟时结果会有随机波动，但样本越大越接近理论比例。</p>
+    <small>虚拟实验用于课堂学习，不代表真实实验中的全部影响因素。</small>
+  </div>
+</main>
+
+<script>
+function gam(g){
+  return g==="AA"?["A","A"]:g==="aa"?["a","a"]:["A","a"];
+}
+function phenotype(g){
+  return g==="aa" ? "green" : "yellow";
+}
+function phenotypeName(g){
+  return g==="aa" ? "绿色" : "黄色";
+}
+function peaHTML(g, cls="punnett-pea"){
+  const color = phenotype(g);
+  const bg = color==="yellow" ? "#f1c93b" : "#56a764";
+  return `<span class="${cls}" style="background:${bg}" title="${phenotypeName(g)}"></span>`;
+}
+function setParentVisual(id, textId, genotype){
+  const el=document.getElementById(id);
+  const txt=document.getElementById(textId);
+  el.className="pea "+phenotype(genotype);
+  el.textContent=genotype;
+  txt.textContent=phenotypeName(genotype)+"豌豆（"+genotype+"）";
+}
+function run(){
+  const g1=p1.value, g2=p2.value;
+  setParentVisual("parentPea1","parentText1",g1);
+  setParentVisual("parentPea2","parentText2",g2);
+
+  let a=gam(g1), b=gam(g2), q=[], x={AA:0,Aa:0,aa:0};
+  let children=[];
+
+  for(let i=0;i<100;i++){
+    let z=[a[Math.random()*2|0],b[Math.random()*2|0]].sort().join("");
+    x[z]++; children.push(z);
+  }
+
+  for(let i of a){
+    q.push(b.map(j=>(i+j).split("").sort().join("")));
+  }
+
+  t.innerHTML=
+    "<tr><th>×</th><th>"+b[0]+"</th><th>"+b[1]+"</th></tr>"+
+    q.map((v,i)=>
+      "<tr><th>"+a[i]+"</th>"+
+      "<td>"+v[0]+peaHTML(v[0])+"</td>"+
+      "<td>"+v[1]+peaHTML(v[1])+"</td></tr>"
+    ).join("");
+
+  let y=x.AA+x.Aa, g=x.aa;
+  r.innerHTML=
+    `基因型：AA ${x.AA}，Aa ${x.Aa}，aa ${x.aa}<br>`+
+    `表现型：黄色 ${y}，绿色 ${g}`+
+    `<p>黄色 ${y}%</p><div class="bar yellow"><i style="width:${y}%"></i></div>`+
+    `<p>绿色 ${g}%</p><div class="bar green"><i style="width:${g}%"></i></div>`;
+
+  offspringGrid.innerHTML = children.map((geno,i)=>
+    `<span class="mini-pea ${phenotype(geno)}" style="animation-delay:${Math.min(i*12,600)}ms" title="${geno} / ${phenotypeName(geno)}"></span>`
+  ).join("");
+
+  summary.textContent=`本次模拟：黄色 ${y} 粒，绿色 ${g} 粒（黄色:绿色 ≈ ${g? (y/g).toFixed(2):"∞"}:1）`;
+}
+run();
+</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>
